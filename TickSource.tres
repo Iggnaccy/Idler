@@ -1,0 +1,6 @@
+[gd_resource type="Resource" script_class="TickSource" load_steps=2 format=3 uid="uid://dw5lfs1pu8ncq"]
+
+[ext_resource type="Script" path="res://Scripts/TickSource.cs" id="1_ksgwr"]
+
+[resource]
+script = ExtResource("1_ksgwr")
