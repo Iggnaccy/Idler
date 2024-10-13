@@ -7,6 +7,8 @@ using UnityEngine;
 
 public class GameController : MonoBehaviour
 {
+    [SerializeField] private double interval = 1.0;
+
     private World gameWorld;
     private EntityManager entityManager;
 
@@ -31,7 +33,7 @@ public class GameController : MonoBehaviour
         entityManager.SetComponentData(baseResourceEntity, new DescriptionComponent("Base Resource"));
 
         tickerEntity = entityManager.CreateSingleton<TickerComponent>();
-        entityManager.SetComponentData(tickerEntity, new TickerComponent { LastTick = DateTimeOffset.Now.Ticks, TickInterval = TimeSpan.FromSeconds(0.1).Ticks });
+        entityManager.SetComponentData(tickerEntity, new TickerComponent { LastTick = DateTimeOffset.Now.Ticks, TickInterval = TimeSpan.FromSeconds(interval).Ticks });
 
         //tickerSystem = gameWorld.CreateSystem<TickerSystem>(); apparently it's not necessary to create the system manually
 
