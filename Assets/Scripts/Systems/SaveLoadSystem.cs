@@ -60,47 +60,26 @@ public partial class SaveLoadSystem : SystemBase
                 i += sizeof(int);
                 SaveableComponent.SaveableType type = (SaveableComponent.SaveableType)BitConverter.ToInt32(bytes, i);
                 i += sizeof(int);
+                NativeList<byte> list = new NativeList<byte>(Allocator.TempJob);
                 switch (type)
                 {
-                    case SaveableComponent.SaveableType.Resource:
-                        Assert.IsTrue(i + 8 <= bytes.Length);
-                        // add 8 bytes for the resource component to the save chunk
-                        NativeList<byte> list = new NativeList<byte>(Allocator.TempJob);
-                        for (int j = 0; j < 8; j++)
-                        {
-                            list.Add(bytes[i + j]);
-                        }
-                        // move i to the next saveable component
-                        i += 8;
-                        // add the resource component save chunk to the save chunks hashmap
-                        saveChunks.Add(id, list);
+                    case SaveableComponent.SaveableType.Resource: // all ResourceComponents are 16 bytes = double2 in save data
+                        ReadResourceComponent(bytes, ref i, ref list);
                         break;
-                    case SaveableComponent.SaveableType.ResourceProducer:
-                        Assert.IsTrue(i + 68 <= bytes.Length);
-                        // add 68 bytes for the resource producer component to the save chunk
-                        NativeList<byte> list2 = new NativeList<byte>(Allocator.TempJob);
-                        for (int j = 0; j < 68; j++)
-                        {
-                            list2.Add(bytes[i + j]);
-                        }
-                        // move i to the next saveable component
-                        i += 68;
-                        // add the resource producer component save chunk to the save chunks hashmap
-                        saveChunks.Add(id, list2);
+                    case SaveableComponent.SaveableType.ResourceProducer: // all ResourceProducerComponents also have a ResourceComponent, so total size is 68 + 16 = 84 bytes = ((8 + 8) + (8 + 8) + 4) + ((8 + 8) + 4)
+                        ReadResourceProducerComponent(bytes, ref i, ref list);
                         break;
-                    case SaveableComponent.SaveableType.Ticker:
-                        Assert.IsTrue(i + 16 <= bytes.Length);
-                        // add 16 bytes for the ticker component to the save chunk
-                        NativeList<byte> list3 = new NativeList<byte>(Allocator.TempJob);
-                        for (int j = 0; j < 16; j++)
-                        {
-                            list3.Add(bytes[i + j]);
-                        }
-                        // move i to the next saveable component
-                        i += 16;
-                        // add the ticker component save chunk to the save chunks hashmap
-                        saveChunks.Add(id, list3);
+                    case SaveableComponent.SaveableType.Ticker: // all TickerComponents are 16 bytes = 8 + 8 bytes
+                        ReadTicker(bytes, ref i, ref list);
                         break;
+                }
+                if (!saveChunks.ContainsKey(id))
+                {
+                    saveChunks.Add(id, list);
+                }
+                else
+                {
+                    Debug.LogWarning($"Duplicate saveable component ID: {id}");
                 }
             }
         }
@@ -122,8 +101,10 @@ public partial class SaveLoadSystem : SystemBase
 
         Entities
             .WithReadOnly(saveChunks)
-            .WithDisposeOnCompletion(saveChunks)
             .WithNativeDisableContainerSafetyRestriction(saveChunks)
+            .WithNativeDisableParallelForRestriction(ResourceLookup)
+            .WithNativeDisableParallelForRestriction(ResourceProducerLookup)
+            .WithNativeDisableParallelForRestriction(TickerLookup)
             .ForEach((Entity e, in SaveableComponent saveable) =>
         {
             var saveChunk = saveChunks[saveable.ID];
@@ -150,7 +131,49 @@ public partial class SaveLoadSystem : SystemBase
             }
         }).ScheduleParallel(Dependency).Complete();
 
+        foreach (var kvp in saveChunks)
+        {
+            kvp.Value.Dispose();
+        }
+        saveChunks.Dispose();
+
         OnLoad?.Invoke(true);
+    }
+
+    private static void ReadTicker(in byte[] bytes, ref int i, ref NativeList<byte> list)
+    {
+        Assert.IsTrue(i + 16 <= bytes.Length); // 16 = 8 (long) * 2
+        // add 16 bytes for the ticker component to the save chunk
+        for (int j = 0; j < 16; j++)
+        {
+            list.Add(bytes[i + j]);
+        }
+        // move i to the next saveable component
+        i += 16;
+    }
+
+    private static void ReadResourceProducerComponent(in byte[] bytes, ref int i, ref NativeList<byte> list)
+    {
+        Assert.IsTrue(i + 84 <= bytes.Length); // 84 = 16 (ResourceComponent) + 68 (ResourceProducerComponent)
+        // add 84 bytes for the resource producer component to the save chunk
+        for (int j = 0; j < 84; j++)
+        {
+            list.Add(bytes[i + j]);
+        }
+        // move i to the next saveable component
+        i += 84;
+    }
+
+    private static void ReadResourceComponent(in byte[] bytes, ref int i, ref NativeList<byte> list)
+    {
+        Assert.IsTrue(i + 16 <= bytes.Length); // 16 = 8 (double) * 2
+        // add 16 bytes for the resource component to the save chunk
+        for (int j = 0; j < 16; j++)
+        {
+            list.Add(bytes[i + j]);
+        }
+        // move i to the next saveable component
+        i += 16;
     }
 
     private void SaveGame()
@@ -197,24 +220,24 @@ public partial class SaveLoadSystem : SystemBase
 
     private static void WriteResourceComponent(in ResourceComponent resource, in NativeList<byte> saveData)
     {
-        WriteDouble2(resource.Amount, saveData);
+        WriteDouble2(resource.Amount, saveData); // 8*2 = 16 bytes
         // total size: 8*2 = 16 bytes
     }
 
     private static void WriteResourceProducerComponent(in ResourceProducerComponent producer, in NativeList<byte> saveData)
     {
-        WriteDouble2(producer.ProducedAmount, saveData);
-        WriteDouble2(producer.NextPurchaseCost, saveData);
-        WriteDouble2(producer.PurchaseMultiplier, saveData);
-        WriteDouble2(producer.NextPurchaseBarrier, saveData);
-        WriteInt(producer.PurchaseBarriersPassed, saveData);
+        WriteDouble2(producer.ProducedAmount, saveData); // 8*2 = 16 bytes
+        WriteDouble2(producer.NextPurchaseCost, saveData); // 8*2 = 16 bytes
+        WriteDouble2(producer.PurchaseMultiplier, saveData); // 8*2 = 16 bytes
+        WriteDouble2(producer.NextPurchaseBarrier, saveData); // 8*2 = 16 bytes
+        WriteInt(producer.PurchaseBarriersPassed, saveData); // 4 bytes
         // total size: 8*2 * 4 + 4 = 68 bytes
     }
 
     private static void WriteTickerComponent(in TickerComponent ticker, in NativeList<byte> saveData)
     {
-        WriteLong(ticker.LastTick, saveData);
-        WriteLong(ticker.TickInterval, saveData);
+        WriteLong(ticker.LastTick, saveData); // 8 bytes
+        WriteLong(ticker.TickInterval, saveData); // 8 bytes
         // total size: 8 * 2 = 16 bytes
     }
 
