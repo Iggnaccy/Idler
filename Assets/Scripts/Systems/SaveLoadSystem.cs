@@ -59,6 +59,13 @@ public partial class SaveLoadSystem : SystemBase
                 int id;
                 SaveableComponent.SaveableType type;
                 (id, type) = ReadSaveable(bytes, ref i);
+                Version saveVersion = ReadVersion(bytes, ref i);
+                if(!IsSaveVersionCompatible(saveVersion))
+                {
+                    Debug.LogError($"Save version {saveVersion} is not compatible with current version {GameController.Version}");
+                    OnLoad?.Invoke(false);
+                    return;
+                }
                 NativeList<byte> list = new NativeList<byte>(Allocator.TempJob);
                 switch (type)
                 {
@@ -139,6 +146,21 @@ public partial class SaveLoadSystem : SystemBase
         OnLoad?.Invoke(true);
     }
 
+    private bool IsSaveVersionCompatible(Version saveVersion)
+    {
+        return saveVersion.Major == GameController.LastSupportedSaveVersion.Major && saveVersion.Minor == GameController.LastSupportedSaveVersion.Minor;
+    }
+
+    private static Version ReadVersion(in byte[] bytes, ref int i)
+    {
+        Assert.IsTrue(i + 3 * sizeof(int) <= bytes.Length); // 3 * 4 = 12 bytes
+        int major = BitConverter.ToInt32(bytes, i);
+        int minor = BitConverter.ToInt32(bytes, i + sizeof(int));
+        int build = BitConverter.ToInt32(bytes, i + 2 * sizeof(int));
+        i += 3 * sizeof(int);
+        return new Version(major, minor, build);
+    }
+
     private static (int, SaveableComponent.SaveableType) ReadSaveable(in byte[] bytes, ref int i)
     {
         Assert.IsTrue(i + 1 <= bytes.Length); // 1 = 5 bits + 3 bits
@@ -188,6 +210,7 @@ public partial class SaveLoadSystem : SystemBase
     private void SaveGame()
     {
         NativeList<byte> saveData = new NativeList<byte>(Allocator.TempJob);
+        WriteVersion(saveData);
         try
         {
             Entities.ForEach((Entity e, in SaveableComponent saveable) =>
@@ -220,12 +243,20 @@ public partial class SaveLoadSystem : SystemBase
         OnSave?.Invoke(true);
     }
 
+    private void WriteVersion(in NativeList<byte> saveData)
+    {
+        byte[] bytes = new byte[3 * sizeof(int)];
+        BitConverter.GetBytes(GameController.Version.Major).CopyTo(bytes, 0);
+        BitConverter.GetBytes(GameController.Version.Minor).CopyTo(bytes, sizeof(int));
+        BitConverter.GetBytes(GameController.Version.Build).CopyTo(bytes, 2 * sizeof(int));
+        for(int i = 0; i < bytes.Length; i++)
+        {
+            saveData.Add(bytes[i]);
+        }
+    }
+
     private static void WriteSaveableComponent(in SaveableComponent saveable, in NativeList<byte> saveData)
     {
-        //WriteInt(saveable.ID, saveData);
-        //WriteInt((int)saveable.Type, saveData);
-        // total size: 4*2 = 8 bytes
-
         // these are small, we can fit them both in 1 byte
         byte save = (byte)(saveable.ID << 3); // 5 bits for ID
         save |= (byte)saveable.Type; // 3 bits for type
