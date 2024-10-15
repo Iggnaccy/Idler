@@ -56,10 +56,9 @@ public partial class SaveLoadSystem : SystemBase
             while (i < bytes.Length)
             {
                 // Read saveable component
-                int id = BitConverter.ToInt32(bytes, i);
-                i += sizeof(int);
-                SaveableComponent.SaveableType type = (SaveableComponent.SaveableType)BitConverter.ToInt32(bytes, i);
-                i += sizeof(int);
+                int id;
+                SaveableComponent.SaveableType type;
+                (id, type) = ReadSaveable(bytes, ref i);
                 NativeList<byte> list = new NativeList<byte>(Allocator.TempJob);
                 switch (type)
                 {
@@ -140,6 +139,16 @@ public partial class SaveLoadSystem : SystemBase
         OnLoad?.Invoke(true);
     }
 
+    private static (int, SaveableComponent.SaveableType) ReadSaveable(in byte[] bytes, ref int i)
+    {
+        Assert.IsTrue(i + 1 <= bytes.Length); // 1 = 5 bits + 3 bits
+        byte save = bytes[i];
+        int id = save >> 3;
+        SaveableComponent.SaveableType type = (SaveableComponent.SaveableType)(save & 0b111);
+        i++;
+        return (id, type);
+    }
+
     private static void ReadTicker(in byte[] bytes, ref int i, ref NativeList<byte> list)
     {
         Assert.IsTrue(i + 16 <= bytes.Length); // 16 = 8 (long) * 2
@@ -213,9 +222,14 @@ public partial class SaveLoadSystem : SystemBase
 
     private static void WriteSaveableComponent(in SaveableComponent saveable, in NativeList<byte> saveData)
     {
-        WriteInt(saveable.ID, saveData);
-        WriteInt((int)saveable.Type, saveData);
+        //WriteInt(saveable.ID, saveData);
+        //WriteInt((int)saveable.Type, saveData);
         // total size: 4*2 = 8 bytes
+
+        // these are small, we can fit them both in 1 byte
+        byte save = (byte)(saveable.ID << 3); // 5 bits for ID
+        save |= (byte)saveable.Type; // 3 bits for type
+        saveData.Add(save);
     }
 
     private static void WriteResourceComponent(in ResourceComponent resource, in NativeList<byte> saveData)
