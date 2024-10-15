@@ -345,6 +345,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2e722a371fb947b428e9b09bdb366f99, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  interval: 1
 --- !u!4 &1495796634
 Transform:
   m_ObjectHideFlags: 0
@@ -576,6 +577,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   text: {fileID: 1571418820}
+  gameController: {fileID: 1495796633}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

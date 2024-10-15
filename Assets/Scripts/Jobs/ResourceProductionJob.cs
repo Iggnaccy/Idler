@@ -11,12 +11,17 @@ public partial struct ResourceProductionJob : IJobEntity
 
     private void Execute([EntityIndexInQuery] int entityIndex, in ResourceProducerComponent producer, in ResourceComponent producerResource)
     {
+        if (producerResource.Amount.x <= 0)
+        {
+            return; // No resources to produce
+        }
+
         // Perform the calculation
         var resource = ResourceLookup[producer.ProducedResource];
 
         var result = producer.ProducedAmount; // Copy the value
         result.MultiplyBigNum(producerResource.Amount); // Multiply by the producer resource amount
-        result.AddBigNum(resource.Amount); // Add the current resource amount
+        //result.AddBigNum(resource.Amount); // Add the current resource amount
 
         // Store the result
         Results[entityIndex] = result;

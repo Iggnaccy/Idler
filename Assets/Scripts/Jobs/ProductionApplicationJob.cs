@@ -14,7 +14,9 @@ public partial struct ProductionApplicationJob : IJobEntity
     public void Execute([EntityIndexInQuery] int entityIndex, in ResourceProducerComponent resourceProducer)
     {
         var resource = ResourceLookup[resourceProducer.ProducedResource];
-        resource.Amount = Results[entityIndex];
+        var final = Results[entityIndex];
+        final.AddBigNum(resource.Amount);
+        resource.Amount = final;
         ResourceLookup[resourceProducer.ProducedResource] = resource; // This causes issues if ever there are two resource producers producing the same resource
     }
 }

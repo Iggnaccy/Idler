@@ -13,7 +13,7 @@ public partial struct TickerSystem : ISystem
     private EntityQuery producerQuery, tickerQuery, resourceQuery;
     private ComponentLookup<ResourceComponent> readonlyResourceLookup, writableResourceLookup;
 
-    public static event Action<ResourceComponent[], DescriptionComponent[]> OnResourcesProduced;
+    public static event Action OnResourcesProduced;
 
     private const int MAX_PRODUCTION_CYCLES = 500;
 
@@ -79,16 +79,8 @@ public partial struct TickerSystem : ISystem
 
             updateLastProductionTimeJobHandle.Complete();
         }
-
-        var allResourceEntities = resourceQuery.ToEntityArray(Allocator.Temp);
-        var filteredResourceEntities = allResourceEntities.Where(x => entityManager.GetComponentData<ResourceComponent>(x).IsDirty);
-
-        var producedResources = filteredResourceEntities.Select(x => entityManager.GetComponentData<ResourceComponent>(x)).ToArray();
-        var descriptions = filteredResourceEntities.Select(x => entityManager.GetComponentData<DescriptionComponent>(x)).ToArray();
         
-        OnResourcesProduced?.Invoke(producedResources, descriptions);
-        
-        allResourceEntities.Dispose();
+        OnResourcesProduced?.Invoke();
 
         var undirty = new UndirtyJob();
         undirty.ScheduleParallel(resourceQuery, default).Complete();

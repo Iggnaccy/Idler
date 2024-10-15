@@ -4,14 +4,16 @@ using System.Collections.Generic;
 using System.Text;
 using TMPro;
 using Unity.Collections;
+using Unity.Entities;
 using UnityEngine;
 
 public class DumpTextUpdater : MonoBehaviour
 {
     [SerializeField] private TextMeshProUGUI text;
+    [SerializeField] private GameController gameController;
 
-    private Dictionary<string, int> lineOrder = new Dictionary<string, int>();
-    private List<string> lines = new List<string>();
+    private Dictionary<int, string> displayLines = new Dictionary<int, string>();
+    private StringBuilder sb = new StringBuilder();
 
     private void Start()
     {
@@ -23,52 +25,76 @@ public class DumpTextUpdater : MonoBehaviour
         TickerSystem.OnResourcesProduced -= UpdateText;
     }
 
-    private void UpdateText(ResourceComponent[] resources, DescriptionComponent[] descriptions)
+    private void UpdateText()
     {
-        UpdateDictionary(descriptions);
-        UpdateLines(resources, descriptions);
-    }
-
-    private void UpdateLines(in ResourceComponent[] resources, in DescriptionComponent[] descriptions)
-    {
-        for (int i = 0; i < descriptions.Length; i++)
+        sb.Clear();
+        var entityManager = gameController.GetEntityManager();
+        var baseResource = entityManager.GetComponentData<ResourceComponent>(gameController.baseResourceEntity);
+        if(baseResource.IsDirty)
         {
-            var description = descriptions[i];
-            var resource = resources[i];
-            var keyString = GetDescriptionString(description);
-            var lineIndex = lineOrder[keyString];
-            if(lineIndex >= lines.Count)
+            var baseDescription = entityManager.GetComponentData<DescriptionComponent>(gameController.baseResourceEntity);
+            displayLines[0] = $"{GetDescriptionString(baseDescription)}: {baseResource.Amount.ToBigNumString()}";
+        }
+
+        var resources = new ResourceComponent[gameController.resourceProductionEntities.Count];
+        for (int i = 0; i < gameController.resourceProductionEntities.Count; i++)
+        {
+            resources[i] = entityManager.GetComponentData<ResourceComponent>(gameController.resourceProductionEntities[i]);
+            if(resources[i].IsDirty)
             {
-                lines.Add($"{keyString}: {resource.Amount.ToBigNumString()}");
-            }
-            else
-            {
-                lines[lineIndex] = $"{keyString}: {resource.Amount.ToBigNumString()}";
+                var description = entityManager.GetComponentData<DescriptionComponent>(gameController.resourceProductionEntities[i]);
+                displayLines[i + 1] = $"{GetDescriptionString(description)}: {resources[i].Amount.ToBigNumString()}";
             }
         }
-        text.SetText(string.Join("\n", lines));
-    }
 
-    private void UpdateDictionary(in IEnumerable<DescriptionComponent> descriptions)
-    {
-        foreach (var description in descriptions)
+        foreach (var line in displayLines)
         {
-            var count = lineOrder.Count;
-            var keyString = GetDescriptionString(description);
-            if (!lineOrder.ContainsKey(keyString))
-            {
-                lineOrder.Add(keyString, count);
-            }
+            sb.AppendLine(line.Value);
         }
+
+        text.SetText(sb.ToString());
     }
 
+    //private void UpdateLines(in ResourceComponent[] resources, in DescriptionComponent[] descriptions)
+    //{
+    //    for (int i = 0; i < descriptions.Length; i++)
+    //    {
+    //        var description = descriptions[i];
+    //        var resource = resources[i];
+    //        var keyString = GetDescriptionString(description);
+    //        var lineIndex = lineOrder[keyString];
+    //        if(lineIndex >= lines.Count)
+    //        {
+    //            lines.Add($"{keyString}: {resource.Amount.ToBigNumString()}");
+    //        }
+    //        else
+    //        {
+    //            lines[lineIndex] = $"{keyString}: {resource.Amount.ToBigNumString()}";
+    //        }
+    //    }
+    //    text.SetText(string.Join("\n", lines));
+    //}
+    //
+    //private void UpdateDictionary(in IEnumerable<DescriptionComponent> descriptions)
+    //{
+    //    foreach (var description in descriptions)
+    //    {
+    //        var count = lineOrder.Count;
+    //        var keyString = GetDescriptionString(description);
+    //        if (!lineOrder.ContainsKey(keyString))
+    //        {
+    //            lineOrder.Add(keyString, count);
+    //        }
+    //    }
+    //}
+    //
     private string GetDescriptionString(in DescriptionComponent description)
     {
-        var sb = new StringBuilder();
+        var descSB = new StringBuilder();
         foreach (var c in description.Description)
         {
-            sb.Append(c);
+            descSB.Append(c);
         }
-        return sb.ToString();
+        return descSB.ToString();
     }
 }

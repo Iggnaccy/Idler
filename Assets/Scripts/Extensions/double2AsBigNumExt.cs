@@ -62,6 +62,13 @@ public static class Double2BigNumExtensions
         a.NormalizeBigNum();
     }
 
+    public static double2 MultiplyBigNumR(in this double2 a, in double2 b)
+    {
+        double2 result = a;
+        result.MultiplyBigNum(b);
+        return result;
+    }
+
     // Add two double2 BigNum values with precision limitation
     public static void AddBigNum(ref this double2 a, double2 b)
     {
@@ -96,6 +103,13 @@ public static class Double2BigNumExtensions
 
         // Normalize the result
         a.NormalizeBigNum();
+    }
+
+    public static double2 AddBigNumR(in this double2 a, in double2 b)
+    {
+        double2 result = a;
+        result.AddBigNum(b);
+        return result;
     }
 
     // Subtract two double2 BigNum values with precision limitation
@@ -140,8 +154,45 @@ public static class Double2BigNumExtensions
         a.NormalizeBigNum();
     }
 
+    public static double2 SubstractBigNumR(in this double2 a, in double2 b)
+    {
+        double2 result = a;
+        result.SubtractBigNum(b);
+        return result;
+    }
+
+    public static void PowBigNum(ref this double2 a,  double b)
+    {
+        // Calculate the power of the mantissa
+        a.x = math.pow(a.x, b);
+
+        // Calculate the power of the exponent
+        a.y *= b;
+
+        // Normalize the result
+        a.NormalizeBigNum();
+    }
+
+    public static double2 PowBigNumR(in this double2 a, in double b)
+    {
+        double2 result = a;
+        result.PowBigNum(b);
+        return result;
+    }
+
     public static string ToBigNumString(in this double2 value)
     {
-        return $"{value.x:F4}e{value.y:F0}";
+        if(value.y < 6)
+        {
+            double result = value.x * math.pow(10, value.y);
+            return result.ToString("0.###");
+        }
+        if(value.y < 1_000_000)
+        {
+            return $"{value.x:F3}e{value.y:F0}";
+        }
+        var exponent2 = math.floor(math.log10(value.y));
+        var y = value.y / math.pow(10, exponent2);
+        return $"{value.x:F3}e{y:F0}e{exponent2:F0}";
     }
 }
