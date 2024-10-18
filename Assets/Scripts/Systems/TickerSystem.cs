@@ -14,6 +14,7 @@ public partial struct TickerSystem : ISystem
     private ComponentLookup<ResourceComponent> readonlyResourceLookup, writableResourceLookup;
 
     public static event Action OnResourcesProduced;
+    public static bool IsEnabled = false; // needs to be explicitly enabled
 
     private const int MAX_PRODUCTION_CYCLES = 500;
 
@@ -28,8 +29,18 @@ public partial struct TickerSystem : ISystem
         Debug.Log("TickerSystem created");
     }
 
+    public static void TriggerEvent()
+    {
+        OnResourcesProduced?.Invoke();
+    }
+
     public void OnUpdate(ref SystemState state)
     {
+        if(!IsEnabled)
+        {
+            return;
+        }
+
         var tickerList = tickerQuery.ToEntityArray(Allocator.Temp);
         var ticker = tickerList.FirstOrDefault();
         if (ticker == Entity.Null)

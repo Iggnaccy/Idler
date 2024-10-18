@@ -13,10 +13,16 @@ public partial struct ProductionApplicationJob : IJobEntity
     [ReadOnly] public NativeArray<double2> Results;
     public void Execute([EntityIndexInQuery] int entityIndex, in ResourceProducerComponent resourceProducer)
     {
-        var resource = ResourceLookup[resourceProducer.ProducedResource];
         var final = Results[entityIndex];
+
+        if(final.x <= 0)
+        {
+            return; // No resources to produce
+        }
+
+        var resource = ResourceLookup[resourceProducer.ProducedResource];
         final.AddBigNum(resource.Amount);
         resource.Amount = final;
-        ResourceLookup[resourceProducer.ProducedResource] = resource; // This causes issues if ever there are two resource producers producing the same resource
+        ResourceLookup[resourceProducer.ProducedResource] = resource; 
     }
 }

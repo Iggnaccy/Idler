@@ -154,7 +154,7 @@ public static class Double2BigNumExtensions
         a.NormalizeBigNum();
     }
 
-    public static double2 SubstractBigNumR(in this double2 a, in double2 b)
+    public static double2 SubtractBigNumR(in this double2 a, in double2 b)
     {
         double2 result = a;
         result.SubtractBigNum(b);
@@ -178,6 +178,19 @@ public static class Double2BigNumExtensions
         double2 result = a;
         result.PowBigNum(b);
         return result;
+    }
+
+    public static bool IsBigNumGreaterThan(in this double2 a, in double2 b)
+    {
+        if (a.y > b.y)
+        {
+            return true;
+        }
+        if (a.y < b.y)
+        {
+            return false;
+        }
+        return a.x > b.x;
     }
 
     public static string ToBigNumString(in this double2 value)

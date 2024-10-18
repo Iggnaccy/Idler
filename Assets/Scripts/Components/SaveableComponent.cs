@@ -9,6 +9,7 @@ public struct SaveableComponent : IComponentData
     {
         Resource,
         ResourceProducer,
-        Ticker
+        Ticker,
+        Upgrade
     }
 }
