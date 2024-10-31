@@ -8,6 +8,8 @@ using UnityEngine;
 public class GameController : MonoBehaviour
 {
     [SerializeField] private double interval = 1.0;
+    [SerializeField] private ProducerUIPanel producerUIPanel;
+    [SerializeField] private ResourceUI mainResourceUI;
 
     private World gameWorld;
 
@@ -20,13 +22,15 @@ public class GameController : MonoBehaviour
     private SystemHandle tickerSystem;
     private ComponentSystemBase saveLoadSystem;
 
-    public readonly static Version Version = new Version(0, 1, 0);
-    public readonly static Version LastSupportedSaveVersion = new Version(0, 1, 0); // Update this when the save format changes
+    public readonly static Version Version = new Version(0, 1, 1);
+    public readonly static Version LastSupportedSaveVersion = new Version(0, 1, 0); // Update this when the save format changes.
+                                                                                    // Most recent change: Added Upgrades.
+                                                                                    // Not changing supported version - supports missing upgrade table by assuming no upgrades are bought.
 
     private static int nextID = 0;
     public static int NextId()
     {
-        if (nextID >= 0b11111)
+        if (nextID >= (1 << 13) - 1)
         {
             Debug.LogError("Ran out of IDs!");
             return -1;
@@ -44,10 +48,10 @@ public class GameController : MonoBehaviour
         gameWorld = World.DefaultGameObjectInjectionWorld;
         entityManager = gameWorld.EntityManager;
 
-        resourceArchetype = entityManager.CreateArchetype(typeof(ResourceComponent), typeof(DescriptionComponent), typeof(SaveableComponent));
-        resourceProductionArchetype = entityManager.CreateArchetype(typeof(ResourceProducerComponent), typeof(ResourceComponent), typeof(DescriptionComponent), typeof(SaveableComponent), typeof(PurchasableComponent));
+        resourceArchetype = entityManager.CreateArchetype(typeof(ResourceComponent), typeof(DescriptionComponent), typeof(SaveableComponent), typeof(NameComponent));
+        resourceProductionArchetype = entityManager.CreateArchetype(typeof(ResourceProducerComponent), typeof(ResourceComponent), typeof(DescriptionComponent), typeof(SaveableComponent), typeof(PurchasableComponent), typeof(NameComponent));
         tickerArchetype = entityManager.CreateArchetype(typeof(TickerComponent), typeof(SaveableComponent)); // No description because it's not a player-visible entity
-        upgradeArchetype = entityManager.CreateArchetype(typeof(UpgradeComponent), typeof(DescriptionComponent), typeof(UnlockableComponent), typeof(PurchasableComponent));
+        upgradeArchetype = entityManager.CreateArchetype(typeof(UpgradeComponent), typeof(DescriptionComponent), typeof(UnlockableComponent), typeof(PurchasableComponent), typeof(NameComponent));
 
         tickerEntity = entityManager.CreateEntity(tickerArchetype);
         entityManager.SetComponentData(tickerEntity, new TickerComponent { LastTick = DateTimeOffset.Now.Ticks, TickInterval = TimeSpan.FromSeconds(interval).Ticks });
@@ -59,23 +63,25 @@ public class GameController : MonoBehaviour
 
         // Setup Major Layer 1:
         baseResourceEntity = entityManager.CreateEntity(resourceArchetype);
-        entityManager.SetComponentData(baseResourceEntity, new ResourceComponent { Amount = new double2(100, 0), IsDirty = true });
-        entityManager.SetComponentData(baseResourceEntity, new DescriptionComponent("Base Resource"));
+        entityManager.SetComponentData(baseResourceEntity, new ResourceComponent { Amount = new double2(10, 0), IsDirty = true });
+        entityManager.SetComponentData(baseResourceEntity, new DescriptionComponent("Resource used to purchase producers and upgrades"));
         entityManager.SetComponentData(baseResourceEntity, new SaveableComponent { ID = NextId(), Type = SaveableComponent.SaveableType.Resource });
+        entityManager.SetComponentData(baseResourceEntity, new NameComponent("Base Resource"));
 
         // Producers:
         for (int i = 0; i < 10; i++)
         {
             var entity = entityManager.CreateEntity(resourceProductionArchetype);
-            entityManager.SetComponentData(entity, new ResourceComponent { Amount = new double2(1, 0), IsDirty = true });
+            entityManager.SetComponentData(entity, new ResourceComponent { Amount = new double2(0, 0), IsDirty = true });
             entityManager.SetComponentData(entity, new ResourceProducerComponent
             {
                 ProducedAmount = Double2BigNumExtensions.BigNum.GetNormalized(1, 0),
                 ProducedResource = i == 0 ? baseResourceEntity : resourceProductionEntities[i - 1]
             });
             entityManager.SetComponentData(entity, new SaveableComponent { ID = NextId(), Type = SaveableComponent.SaveableType.ResourceProducer }); // ID 2 is the first resource producer (after the base resource and the ticker)
-            entityManager.SetComponentData(entity, new DescriptionComponent($"Resource Producer {i}"));
-            entityManager.SetComponentData(entity, new PurchasableComponent { NextCostAmount = new double2(1, i + 2), CostCurrency = baseResourceEntity, CostMultiplier = new double2(1.1, 0), NextCostBarrier = new double2(1, 100) });
+            entityManager.SetComponentData(entity, new DescriptionComponent($"Producer producing {(i > 0 ? $"producer {i}" : "base resource")}"));
+            entityManager.SetComponentData(entity, new PurchasableComponent { NextCostAmount = new double2(1, i + 1), CostCurrency = baseResourceEntity, CostMultiplier = new double2(1.1, 0), NextCostBarrier = new double2(1, 100) });
+            entityManager.SetComponentData(entity, new NameComponent($"Resource Producer {i}"));
             resourceProductionEntities.Add(entity);
         }
 
@@ -96,6 +102,7 @@ public class GameController : MonoBehaviour
                 SubType = UpgradeComponent.UpgradeSubType.Add,
                 UpgradeId = NextUpgradeId()
             });
+            entityManager.SetComponentData(entity, new NameComponent($"Production Add Upgrade {i}"));
             entityManager.SetComponentData(entity, new DescriptionComponent($"Increases Resource Producer's {i} production per unit by 3"));
             entityManager.SetComponentData(entity, new UnlockableComponent { Target = resourceProductionEntities[i], AmountToReach = new double2(1, 2), IsUnlocked = false });
             entityManager.SetComponentData(entity, new PurchasableComponent { NextCostAmount = new double2(1, 5 * (i + 1)), CostCurrency = baseResourceEntity, CostMultiplier = double2.zero, NextCostBarrier = double2.zero });
@@ -140,6 +147,11 @@ public class GameController : MonoBehaviour
         // Cost sub upgrades:
         // These are part of Major Layer 2, permanent upgrades between rebirths/ascensions/layer 1 resets. They will modify the base cost, rather than current.
         // Therefore, not yet implemented.
+
+        producerUIPanel.Setup();
+        mainResourceUI.Setup(baseResourceEntity);
+
+        TickerSystem.IsEnabled = true;
     }
 
     public void Save()

@@ -24,4 +24,6 @@ public readonly struct DescriptionComponent : IComponentData, INativeDisposable
     {
         Description.Dispose();
     }
+
+    public readonly override string ToString() => new string(Description.ToArray());
 }

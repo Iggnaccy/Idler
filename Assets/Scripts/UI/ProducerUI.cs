@@ -8,7 +8,7 @@ using UnityEngine.UI;
 
 public class ProducerUI : MonoBehaviour
 {
-    [SerializeField] private TextMeshProUGUI descriptionText, boughtText, productionText, priceText;
+    [SerializeField] private TextMeshProUGUI nameText, descriptionText, boughtText, productionText, priceText;
     [SerializeField] private Button buyButton;
 
     private Entity entity;
@@ -16,41 +16,41 @@ public class ProducerUI : MonoBehaviour
     public void Setup(Entity e)
     {
         entity = e;
-        TickerSystem.OnResourcesProduced += OnResourcesProduced;
+        buyButton.onClick.AddListener(OnBuyButtonUp);
+
+        var entityManager = World.DefaultGameObjectInjectionWorld.EntityManager;
+        var name = entityManager.GetComponentData<NameComponent>(entity);
+        nameText.text = name.ToString();
+
+        UpdateUI();
     }
 
-    private void OnDestroy()
-    {
-        TickerSystem.OnResourcesProduced -= OnResourcesProduced;
-    }
-
-    private void OnResourcesProduced()
+    public void UpdateUI()
     {
         var entityManager = World.DefaultGameObjectInjectionWorld.EntityManager;
         var purchasable = entityManager.GetComponentData<PurchasableComponent>(entity);
         var resource = entityManager.GetComponentData<ResourceComponent>(entity);
         var producer = entityManager.GetComponentData<ResourceProducerComponent>(entity);
-        if (resource.IsDirty)
-        {
-            UpdateUI(producer, resource, purchasable);
-        }
-
-        var requiredResource = entityManager.GetComponentData<ResourceComponent>(producer.ProducedResource);
-        buyButton.interactable = requiredResource.Amount.IsBigNumGreaterThan(purchasable.NextCostAmount);
+        var description = entityManager.GetComponentData<DescriptionComponent>(entity);
+        
+        UpdateDisplay(description, producer, resource, purchasable);
+        
+        var requiredResource = entityManager.GetComponentData<ResourceComponent>(purchasable.CostCurrency);
+        buyButton.interactable = requiredResource.Amount.IsBigNumGreaterOrEqualThan(purchasable.NextCostAmount);
     }
 
     private void OnBuyButtonUp()
     {
         var entityManager = World.DefaultGameObjectInjectionWorld.EntityManager;
         var newEntity = entityManager.CreateEntity(typeof(PurchaseEvent));
-        entityManager.SetComponentData(newEntity, new PurchaseEvent {Entity = entity});
+        entityManager.SetComponentData(newEntity, new PurchaseEvent {Entity = entity, Type = PurchaseEvent.PurchaseType.Producer});
     }
 
-    private void UpdateUI(in ResourceProducerComponent producer, in ResourceComponent resource, in PurchasableComponent purchasable)
+    private void UpdateDisplay(in DescriptionComponent description, in ResourceProducerComponent producer, in ResourceComponent resource, in PurchasableComponent purchasable)
     {
-        descriptionText.text = "Produces " + producer.ProducedAmount.ToBigNumString() + " " + producer.ProducedResource;
-        boughtText.text = "Bought: " + resource.Amount.ToBigNumString();
-        productionText.text = "Production: " + producer.ProducedAmount.ToBigNumString();
-        priceText.text = "Price: " + purchasable.NextCostAmount.ToBigNumString();
+        descriptionText.text = description.ToString();
+        boughtText.text = resource.Amount.ToBigNumString();
+        productionText.text = producer.ProducedAmount.MultiplyBigNumR(resource.Amount).ToBigNumString() + " per tick";
+        priceText.text = purchasable.NextCostAmount.ToBigNumString();
     }
 }

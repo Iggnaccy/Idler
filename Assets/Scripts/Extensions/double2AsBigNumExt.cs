@@ -138,12 +138,12 @@ public static class Double2BigNumExtensions
         // Align exponents
         if (a.y > b.y)
         {
-            b.x *= math.pow(10, a.y - b.y);
+            b.x *= math.pow(10, b.y - a.y);
             b.y = a.y;
         }
         else if (a.y < b.y)
         {
-            a.x *= math.pow(10, b.y - a.y);
+            a.x *= math.pow(10, a.y - b.y);
             a.y = b.y;
         }
 
@@ -182,15 +182,26 @@ public static class Double2BigNumExtensions
 
     public static bool IsBigNumGreaterThan(in this double2 a, in double2 b)
     {
-        if (a.y > b.y)
+        var normalizedA = BigNum.GetNormalized(a);
+        var normalizedB = BigNum.GetNormalized(b);
+
+        if (normalizedA.y > normalizedB.y)
         {
             return true;
         }
-        if (a.y < b.y)
+        if (normalizedA.y < normalizedB.y)
         {
             return false;
         }
-        return a.x > b.x;
+        return normalizedA.x > normalizedB.x;
+    }
+
+    public static bool IsBigNumGreaterOrEqualThan(in this double2 a, in double2 b)
+    {
+        var normalizedA = BigNum.GetNormalized(a);
+        var normalizedB = BigNum.GetNormalized(b);
+
+        return normalizedA.IsBigNumGreaterThan(normalizedB) || normalizedA.Equals(normalizedB);
     }
 
     public static string ToBigNumString(in this double2 value)
@@ -206,6 +217,6 @@ public static class Double2BigNumExtensions
         }
         var exponent2 = math.floor(math.log10(value.y));
         var y = value.y / math.pow(10, exponent2);
-        return $"{value.x:F3}e{y:F0}e{exponent2:F0}";
+        return $"{value.x:F3}e{y:0.###}e{exponent2:F0}";
     }
 }
