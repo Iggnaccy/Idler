@@ -58,19 +58,21 @@ public partial class SaveLoadSystem : SystemBase
         int i = 0;
         try
         {
+            // Read and validate save version once at the beginning of the file
+            Version saveVersion = ReadVersion(bytes, ref i);
+            if (!IsSaveVersionCompatible(saveVersion))
+            {
+                Debug.LogError($"Save version {saveVersion} is not compatible with current version {GameController.Version}");
+                OnLoad?.Invoke(false);
+                return;
+            }
+
             while (i < bytes.Length)
             {
                 // Read saveable component
                 int id;
                 SaveableComponent.SaveableType type;
                 (id, type) = ReadSaveable(bytes, ref i);
-                Version saveVersion = ReadVersion(bytes, ref i);
-                if(!IsSaveVersionCompatible(saveVersion))
-                {
-                    Debug.LogError($"Save version {saveVersion} is not compatible with current version {GameController.Version}");
-                    OnLoad?.Invoke(false);
-                    return;
-                }
                 NativeList<byte> list = new NativeList<byte>(Allocator.TempJob);
                 switch (type)
                 {
